@@ -1,13 +1,20 @@
 const express = require('express')
 const cors = require('cors')
+const jwt = require('jsonwebtoken')
+const cookieParser = require('cookie-parser')
 const app = express()
 require('dotenv').config()
 const port = process.env.PORT || 5000;
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 
 
-app.use(cors());
+app.use(cors({
+  origin: ['http://localhost:5173'], 
+  credentials: true
+}));
 app.use(express.json());
+app.use(cookieParser());
+
 
 
 
@@ -37,7 +44,37 @@ async function run() {
 const jobsCollection = client.db('jobPortal').collection('jobs');
 const jobApplicationCollection = client.db('jobPortal').collection('job_applications')
 
-     app.get('/jobs', async (req, res) => {
+// Auth releted apis
+
+    app.post('/jwt', async (req, res) => {
+      const  user = req.body;
+      const token = jwt.sign(user, process.env.JWT_SECRET, {expiresIn: '10h'});
+      res
+      .cookie('token', token, {
+        httpOnly: true,
+        secure: false,
+      })
+      .send({success:true});
+
+    })
+
+    app.post('/logout', (req, res) => {
+      res
+      .clearCookie('token', {
+        httpOnly: true, 
+        secure: false
+      })
+      .send({success:true})
+    })
+
+
+
+
+
+
+
+     app.get('/jobs',    async (req, res) => {
+      
         const cursor = jobsCollection.find();
         const result = await cursor.toArray();
         res.send(result);
@@ -54,9 +91,11 @@ const jobApplicationCollection = client.db('jobPortal').collection('job_applicat
 
     // job application apis
 
-    app.get('/job-application', async (req, res) => {
+    app.get('/job-application',  async (req, res) => {
       const email = req.query.email;
       const query = {application_email: email}
+     
+
       const result = await jobApplicationCollection.find(query).toArray();
       for(const application of result) {
         console.log(application.job_id)
@@ -66,7 +105,7 @@ const jobApplicationCollection = client.db('jobPortal').collection('job_applicat
         if(job){
           application.title = job.title;
           application.company = job.company;
-          application.company_logo = job.company_logo;
+          application.company_logo = job.company_logo; 
         }
 
 
